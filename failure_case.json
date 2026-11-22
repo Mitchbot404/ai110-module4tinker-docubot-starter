@@ -1,0 +1,7 @@
+{
+  "query": "Where is the JWT minted?",
+  "retrieval": "I do not know based on these docs.",
+  "rag": "I do not know based on these docs.",
+  "llm_called": false,
+  "expected_evidence": "AUTH.md: Token Generation names generate_access_token in auth_utils.py and calls the output a signed JSON Web Token."
+}

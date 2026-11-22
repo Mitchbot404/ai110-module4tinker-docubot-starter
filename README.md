@@ -80,3 +80,43 @@ You will primarily work in:
 - Python 3.9+
 - A Gemini API key for LLM features (only needed for modes 1 and 3)
 - No database, no server setup, no external services besides LLM calls
+
+## This implementation
+
+Retrieval indexes normalized words, searches heading-delimited sections, and
+returns up to three snippets. It filters weak matches before RAG calls Gemini.
+The simple word-overlap guardrail is a heuristic, not proof that an answer exists.
+
+Naive mode now actually includes the full documentation in its prompt. The
+starter implementation accepted `all_text` but ignored it, contradicting this
+README and the activity instructions. RAG keeps the starter's evidence-only
+prompt and file citations. The model is pinned to `gemini-3.5-flash-lite`:
+Google rejected `gemini-2.5-flash-lite` for this new account.
+
+### Windows commands
+
+From the project folder (the local environment is named `venv`):
+
+```powershell
+.\venv\Scripts\python.exe main.py
+.\venv\Scripts\python.exe -m unittest -v
+.\venv\Scripts\python.exe evaluation.py
+```
+
+To reproduce the six-question comparison, run:
+
+```powershell
+.\venv\Scripts\python.exe compare_modes.py
+```
+
+This last command uses the Gemini API. It spaces requests, stops on an API
+error, and saves completed comparisons in `comparison_results.json`. Existing
+rows are skipped; rename that file if you deliberately want a fresh run.
+Review your project's current free-tier eligibility and quotas before rerunning.
+Never commit `.env`; it is ignored by Git.
+
+See `model_card.md` for the experiment analysis and limitations.
+
+`python compare_modes.py --starter-baseline` makes one separate API call with
+the original starter's no-documentation prompt and saves `starter_baseline.json`.
+It is separate from the corrected full-corpus comparisons.

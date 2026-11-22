@@ -9,6 +9,19 @@ Core DocuBot class responsible for:
 
 import os
 import glob
+import re
+
+STOP_WORDS = set('a an the is are was were be been to of for in on at by with and or do does did i we you it this that these those how where what which when any there from can my all'.split())
+
+
+def words(text):
+    """Normalize punctuation and a few common word forms; ignore filler words."""
+    aliases = {'auth': 'authentication', 'tokens': 'token',
+               'generated': 'generation', 'generates': 'generation',
+               'connect': 'connection', 'lists': 'list', 'returns': 'return',
+               'fields': 'column', 'columns': 'column', 'tables': 'table'}
+    return {aliases.get(word, word) for word in re.findall(r'[a-z0-9]+', text.lower())
+            if word not in STOP_WORDS}
 
 class DocuBot:
     def __init__(self, docs_folder="docs", llm_client=None):
@@ -36,7 +49,7 @@ class DocuBot:
         """
         docs = []
         pattern = os.path.join(self.docs_folder, "*.*")
-        for path in glob.glob(pattern):
+        for path in sorted(glob.glob(pattern)):
             if path.endswith(".md") or path.endswith(".txt"):
                 with open(path, "r", encoding="utf8") as f:
                     text = f.read()
@@ -50,9 +63,7 @@ class DocuBot:
 
     def build_index(self, documents):
         """
-        TODO (Phase 1):
-        Build a tiny inverted index mapping lowercase words to the documents
-        they appear in.
+        Build an inverted index mapping normalized words to source filenames.
 
         Example structure:
         {
@@ -60,11 +71,12 @@ class DocuBot:
             "database": ["DATABASE.md"]
         }
 
-        Keep this simple: split on whitespace, lowercase tokens,
-        ignore punctuation if needed.
+        Tokenization is shared with scoring so query and document terms agree.
         """
         index = {}
-        # TODO: implement simple indexing
+        for filename, text in documents:
+            for word in words(text):
+                index.setdefault(word, []).append(filename)
         return index
 
     # -----------------------------------------------------------
@@ -73,27 +85,46 @@ class DocuBot:
 
     def score_document(self, query, text):
         """
-        TODO (Phase 1):
-        Return a simple relevance score for how well the text matches the query.
-
-        Suggested baseline:
-        - Convert query into lowercase words
-        - Count how many appear in the text
-        - Return the count as the score
+        Count distinct normalized query words present in the text.
+        Repeating a word does not inflate its score.
         """
-        # TODO: implement scoring
-        return 0
+        return len(words(query) & words(text))
 
     def retrieve(self, query, top_k=3):
         """
-        TODO (Phase 1):
-        Use the index and scoring function to select top_k relevant document snippets.
-
-        Return a list of (filename, text) sorted by score descending.
+        Find candidate documents, then score their heading-delimited sections.
+        Require two distinct matches (one for a one-word query) and at least
+        half of the meaningful query terms. Add a small heading-match bonus.
+        Return at most top_k (filename, section) pairs in descending rank.
         """
+        if top_k <= 0:
+            return []
+        query_words = words(query)
+        if not query_words:
+            return []
+        candidates = set()
+        for word in query_words:
+            candidates.update(self.index.get(word, []))
+
         results = []
-        # TODO: implement retrieval logic
-        return results[:top_k]
+        for filename, text in self.documents:
+            if filename not in candidates:
+                continue
+            # Keep each heading with its paragraphs, code examples, and lists.
+            for section in re.split(r'(?m)(?=^#{1,6} )', text):
+                section = section.strip()
+                if not section:
+                    continue
+                score = self.score_document(query, section)
+                # A lone incidental word is weak evidence for a longer question.
+                minimum = min(2, len(query_words))
+                if score >= minimum and score / len(query_words) >= 0.5:
+                    heading = section.splitlines()[0]
+                    # Prefer a matching topic heading over incidental body mentions.
+                    rank = score + 0.5 * self.score_document(query, heading)
+                    results.append((rank, filename, section))
+        results.sort(key=lambda item: (-item[0], item[1], item[2]))
+        return [(filename, section) for _, filename, section in results[:top_k]]
 
     # -----------------------------------------------------------
     # Answering Modes

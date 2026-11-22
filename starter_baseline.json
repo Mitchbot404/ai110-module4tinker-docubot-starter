@@ -1,0 +1,6 @@
+{
+  "query": "Where is the auth token generated?",
+  "model": "gemini-3.5-flash-lite",
+  "context": "none; original starter prompt",
+  "answer": "To tell you where the auth token is generated, I need a little more context! \n\nCould you please specify:\n1. **Which project, repository, or service** you are working on?\n2. **What kind of token** it is (e.g., JWT, OAuth access token, API key, Firebase auth token)?\n\nOnce you share a bit more detail or point me to the relevant part of the codebase, I'd be happy to help you locate the generation logic!"
+}
